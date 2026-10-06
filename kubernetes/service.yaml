@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexvion-web
+  namespace: nexvion
+spec:
+  type: LoadBalancer
+  selector:
+    app: nexvion-web
+  ports:
+    - port: 80
+      targetPort: 8080
