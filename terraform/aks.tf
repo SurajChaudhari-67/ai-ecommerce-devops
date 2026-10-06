@@ -10,6 +10,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
     node_count      = var.aks_node_count
     vm_size         = var.aks_vm_size
     os_disk_size_gb = 64
+     upgrade_settings {
+      max_surge                     = "10%"
+      node_soak_duration_in_minutes = 0
+    }
   }
 
   identity {
