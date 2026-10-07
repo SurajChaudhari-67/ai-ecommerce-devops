@@ -1,0 +1,99 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    ACR_NAME         = 'acrnexvionz034e'
+    ACR_SERVER       = 'acrnexvionz034e.azurecr.io'
+    IMAGE            = 'nexvion-web'
+    RG               = 'rg-nexvion-dev'
+    AKS              = 'aks-nexvion-dev'
+    TAG              = "v${BUILD_NUMBER}"
+    AZURE_CONFIG_DIR = "${WORKSPACE}/.azure"
+    KUBECONFIG       = "${WORKSPACE}/.kube/config"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Build Image') {
+      steps {
+        sh 'docker build -f docker/Dockerfile -t $ACR_SERVER/$IMAGE:$TAG .'
+      }
+    }
+
+    stage('Image Scan (Trivy)') {
+      steps {
+        sh 'trivy image --severity HIGH,CRITICAL --exit-code 0 --no-progress $ACR_SERVER/$IMAGE:$TAG'
+      }
+    }
+
+    stage('Azure Login') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'azure-sp', usernameVariable: 'AZ_APP', passwordVariable: 'AZ_PASS'),
+          string(credentialsId: 'azure-tenant', variable: 'AZ_TENANT')
+        ]) {
+          sh '''
+            az login --service-principal -u "$AZ_APP" -p "$AZ_PASS" --tenant "$AZ_TENANT" > /dev/null
+            az account show --query name -o tsv
+          '''
+        }
+      }
+    }
+
+    stage('Push to ACR') {
+      steps {
+        sh '''
+          az acr login --name $ACR_NAME
+          docker push $ACR_SERVER/$IMAGE:$TAG
+        '''
+      }
+    }
+
+    stage('Deploy to AKS') {
+      steps {
+        sh '''
+          mkdir -p "$WORKSPACE/.kube"
+          az aks get-credentials -g $RG -n $AKS --overwrite-existing
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/service.yaml
+          kubectl apply -f kubernetes/deployment.yaml
+          kubectl set image deployment/nexvion-web web=$ACR_SERVER/$IMAGE:$TAG -n nexvion
+          kubectl rollout status deployment/nexvion-web -n nexvion --timeout=180s
+        '''
+      }
+    }
+
+    stage('Health Check') {
+      steps {
+        sh '''
+          IP=$(kubectl get svc nexvion-web -n nexvion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Service IP: $IP"
+          for i in $(seq 1 10); do
+            if curl -fs http://$IP/health > /dev/null; then
+              echo "Healthy: http://$IP"; exit 0
+            fi
+            echo "Attempt $i failed, retrying..."; sleep 5
+          done
+          echo "Unhealthy"; exit 1
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'az logout || true'
+      sh 'docker image prune -f || true'
+    }
+    success { echo "Deployed $TAG successfully" }
+    failure { echo "Pipeline failed, check the stage logs" }
+  }
+}
