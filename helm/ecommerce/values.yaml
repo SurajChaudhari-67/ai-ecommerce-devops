@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  repository: acrnexvionz034e.azurecr.io/nexvion-web
+  tag: v5
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+
+config:
+  APP_ENV: dev
+  APP_NAME: nexvion
+
+secret:
+  DEMO_API_KEY: change-me
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
