@@ -57,25 +57,23 @@ pipeline {
       }
     }
 
-    stage('Deploy to AKS') {
+       stage('Deploy to AKS') {
       steps {
         sh '''
           mkdir -p "$WORKSPACE/.kube"
           az aks get-credentials -g $RG -n $AKS --overwrite-existing
-          kubectl apply -f kubernetes/namespace.yaml
-          kubectl apply -f kubernetes/service.yaml
-          kubectl apply -f kubernetes/deployment.yaml
-          kubectl set image deployment/nexvion-web web=$ACR_SERVER/$IMAGE:$TAG -n nexvion
+          helm upgrade --install nexvion helm/ecommerce -n nexvion --create-namespace \
+            --set image.tag=$TAG --wait --timeout 3m
           kubectl rollout status deployment/nexvion-web -n nexvion --timeout=180s
         '''
       }
     }
 
-    stage('Health Check') {
+      stage('Health Check') {
       steps {
         sh '''
-          IP=$(kubectl get svc nexvion-web -n nexvion -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Service IP: $IP"
+          IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Ingress IP: $IP"
           for i in $(seq 1 10); do
             if curl -fs http://$IP/health > /dev/null; then
               echo "Healthy: http://$IP"; exit 0
