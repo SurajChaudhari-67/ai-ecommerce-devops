@@ -22,6 +22,18 @@ pipeline {
       steps { checkout scm }
     }
 
+    stage('Security Scans') {
+      steps {
+        sh '''
+          echo "== Secret scan (Gitleaks) =="
+          docker run --rm -v "$WORKSPACE":/repo zricethezav/gitleaks:latest detect --source=/repo --redact --verbose
+
+          echo "== Dependency / config scan (Trivy fs) =="
+          trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs .azure,.kube --exit-code 0 .
+        '''
+      }
+    }
+
     stage('Build Image') {
       steps {
         sh 'docker build -f docker/Dockerfile -t $ACR_SERVER/$IMAGE:$TAG .'
@@ -30,7 +42,7 @@ pipeline {
 
     stage('Image Scan (Trivy)') {
       steps {
-        sh 'trivy image --severity HIGH,CRITICAL --exit-code 0 --no-progress $ACR_SERVER/$IMAGE:$TAG'
+        sh 'trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress $ACR_SERVER/$IMAGE:$TAG'
       }
     }
 
@@ -57,7 +69,7 @@ pipeline {
       }
     }
 
-       stage('Deploy to AKS') {
+    stage('Deploy to AKS') {
       steps {
         sh '''
           mkdir -p "$WORKSPACE/.kube"
@@ -69,7 +81,7 @@ pipeline {
       }
     }
 
-      stage('Health Check') {
+    stage('Health Check') {
       steps {
         sh '''
           IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
