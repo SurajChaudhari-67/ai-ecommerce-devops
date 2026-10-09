@@ -1,0 +1,8 @@
+---
+- name: Configure Nexvion DevOps server
+  hosts: servers
+  become: true
+  roles:
+    - common
+    - docker
+    - hardening
