@@ -1,0 +1,23 @@
+---
+- name: Ensure Docker is installed
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: Check if jenkins user exists
+  ansible.builtin.command: getent passwd jenkins
+  register: jenkins_user
+  changed_when: false
+  failed_when: false
+
+- name: Add jenkins user to docker group
+  ansible.builtin.user:
+    name: jenkins
+    groups: docker
+    append: true
+  when: jenkins_user.rc == 0

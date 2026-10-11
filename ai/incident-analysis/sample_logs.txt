@@ -1,0 +1,14 @@
+10.244.0.5 - - [09/Oct/2026:12:01:10 +0000] "GET / HTTP/1.1" 200 5120 "-" "curl/8.4"
+10.244.0.5 - - [09/Oct/2026:12:01:12 +0000] "GET /products.html HTTP/1.1" 200 8210 "-" "Mozilla/5.0"
+10.244.0.5 - - [09/Oct/2026:12:02:01 +0000] "GET /api/orders HTTP/1.1" 502 157 "-" "Mozilla/5.0"
+2026/10/09 12:02:01 [error] 21#21: *55 connect() failed (111: Connection refused) while connecting to upstream
+ERROR database connection timeout after 30000ms host=db-service:5432
+ERROR database connection timeout after 30000ms host=db-service:5432
+FATAL remaining connection slots are reserved for non-replication superuser connections
+Back-off restarting failed container web in pod nexvion-web-abc12
+Warning Failed ErrImagePull: failed to pull image acrnexvionz034e.azurecr.io/nexvion-web:v99
+Container web terminated: reason=OOMKilled exitCode=137
+write error: No space left on device
+10.244.0.7 - - [09/Oct/2026:12:05:44 +0000] "GET /admin HTTP/1.1" 403 153 "-" "Mozilla/5.0"
+10.244.0.7 - - [09/Oct/2026:12:05:50 +0000] "GET /missing.js HTTP/1.1" 404 153 "-" "Mozilla/5.0"
+dial tcp: lookup db-service: no such host

@@ -1,0 +1,139 @@
+{
+  "generated_at": "2026-10-09T11:45:57.143655+00:00",
+  "lines_analyzed": 14,
+  "overall_severity": "CRITICAL",
+  "findings": [
+    {
+      "issue": "Database connection limit reached",
+      "category": "Database",
+      "severity": "CRITICAL",
+      "occurrences": 1,
+      "possible_root_cause": "Database has run out of connection slots",
+      "suggested_investigation": [
+        "Close idle connections",
+        "Increase max_connections or use a pool",
+        "Check for connection leaks in the application"
+      ],
+      "example": "FATAL remaining connection slots are reserved for non-replication superuser connections"
+    },
+    {
+      "issue": "Disk full",
+      "category": "Infrastructure",
+      "severity": "CRITICAL",
+      "occurrences": 1,
+      "possible_root_cause": "Node or volume has no free disk space",
+      "suggested_investigation": [
+        "Check usage: df -h",
+        "Clean old images/logs (scripts/cleanup.sh)",
+        "Increase disk size or PVC size"
+      ],
+      "example": "write error: No space left on device"
+    },
+    {
+      "issue": "Database connection timeout",
+      "category": "Database",
+      "severity": "HIGH",
+      "occurrences": 2,
+      "possible_root_cause": "Database connectivity or configuration issue",
+      "suggested_investigation": [
+        "Check database availability",
+        "Check network connectivity (service/DNS/ports)",
+        "Verify credentials in the Kubernetes Secret",
+        "Check connection limits and pool size"
+      ],
+      "example": "ERROR database connection timeout after 30000ms host=db-service:5432"
+    },
+    {
+      "issue": "Upstream / bad gateway error",
+      "category": "Networking",
+      "severity": "HIGH",
+      "occurrences": 2,
+      "possible_root_cause": "Backend service is down, restarting or unreachable",
+      "suggested_investigation": [
+        "Check pod status: kubectl get pods -n nexvion",
+        "Check service endpoints: kubectl get endpoints",
+        "Review readiness probe and recent rollouts",
+        "Check backend logs"
+      ],
+      "example": "10.244.0.5 - - [09/Oct/2026:12:02:01 +0000] \"GET /api/orders HTTP/1.1\" 502 157 \"-\" \"Mozilla/5.0\""
+    },
+    {
+      "issue": "Container crash loop",
+      "category": "Kubernetes",
+      "severity": "HIGH",
+      "occurrences": 1,
+      "possible_root_cause": "Container keeps crashing at startup or runtime",
+      "suggested_investigation": [
+        "kubectl logs --previous <pod>",
+        "kubectl describe pod <pod>",
+        "Check config, environment variables and probes",
+        "Roll back: helm rollback nexvion"
+      ],
+      "example": "Back-off restarting failed container web in pod nexvion-web-abc12"
+    },
+    {
+      "issue": "Out of memory (OOMKilled)",
+      "category": "Resources",
+      "severity": "HIGH",
+      "occurrences": 1,
+      "possible_root_cause": "Container exceeded its memory limit",
+      "suggested_investigation": [
+        "Check usage: kubectl top pods",
+        "Increase the memory limit in values.yaml",
+        "Look for memory leaks or traffic spikes"
+      ],
+      "example": "Container web terminated: reason=OOMKilled exitCode=137"
+    },
+    {
+      "issue": "Image pull failure",
+      "category": "Deployment",
+      "severity": "MEDIUM",
+      "occurrences": 1,
+      "possible_root_cause": "Image tag missing in registry or AKS lacks pull permission",
+      "suggested_investigation": [
+        "Verify the tag exists in ACR: az acr repository show-tags",
+        "Check AcrPull role: az aks update --attach-acr",
+        "Check image name and tag in values.yaml"
+      ],
+      "example": "Warning Failed ErrImagePull: failed to pull image acrnexvionz034e.azurecr.io/nexvion-web:v99"
+    },
+    {
+      "issue": "DNS resolution failure",
+      "category": "Networking",
+      "severity": "MEDIUM",
+      "occurrences": 1,
+      "possible_root_cause": "Service name does not resolve (wrong name or CoreDNS issue)",
+      "suggested_investigation": [
+        "Verify the service name and namespace",
+        "Check CoreDNS pods in kube-system",
+        "Test: kubectl run -it --rm dns --image=busybox -- nslookup <name>"
+      ],
+      "example": "dial tcp: lookup db-service: no such host"
+    },
+    {
+      "issue": "Access denied (403/401)",
+      "category": "Security",
+      "severity": "MEDIUM",
+      "occurrences": 1,
+      "possible_root_cause": "Missing permission, bad credentials or probing of protected paths",
+      "suggested_investigation": [
+        "Check source IP and request pattern for abuse",
+        "Verify RBAC and credentials",
+        "Consider rate limiting on the ingress"
+      ],
+      "example": "10.244.0.7 - - [09/Oct/2026:12:05:44 +0000] \"GET /admin HTTP/1.1\" 403 153 \"-\" \"Mozilla/5.0\""
+    },
+    {
+      "issue": "Not found (HTTP 404)",
+      "category": "Application",
+      "severity": "LOW",
+      "occurrences": 1,
+      "possible_root_cause": "Requests for missing files or routes (broken link or scanning)",
+      "suggested_investigation": [
+        "Check for broken links in the frontend",
+        "Ignore if it is random bot traffic"
+      ],
+      "example": "10.244.0.7 - - [09/Oct/2026:12:05:50 +0000] \"GET /missing.js HTTP/1.1\" 404 153 \"-\" \"Mozilla/5.0\""
+    }
+  ]
+}

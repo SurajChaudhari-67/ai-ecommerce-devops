@@ -1,0 +1,6 @@
+---
+- name: Reload ssh
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+  ignore_errors: true

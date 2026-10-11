@@ -6,3 +6,5 @@ crash.log
 .env
 *.pem
 *.key
+backups/
+logs/

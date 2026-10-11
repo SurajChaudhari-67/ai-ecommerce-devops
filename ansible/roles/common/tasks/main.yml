@@ -1,0 +1,28 @@
+---
+- name: Refresh apt package index
+  ansible.builtin.command: apt-get update
+  changed_when: false
+  failed_when: false
+
+- name: Install common packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Create application user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    shell: /bin/bash
+    create_home: true
+
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ app_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0750"
+  loop:
+    - scripts
+    - backups
+    - logs

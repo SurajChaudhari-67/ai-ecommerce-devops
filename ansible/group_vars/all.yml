@@ -1,0 +1,11 @@
+---
+app_user: devops
+app_dir: /opt/nexvion
+common_packages:
+  - git
+  - curl
+  - wget
+  - unzip
+  - jq
+  - vim
+  - htop

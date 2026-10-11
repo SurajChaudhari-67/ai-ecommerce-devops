@@ -1,0 +1,109 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    ACR_NAME         = 'acrnexvionz034e'
+    ACR_SERVER       = 'acrnexvionz034e.azurecr.io'
+    IMAGE            = 'nexvion-web'
+    RG               = 'rg-nexvion-dev'
+    AKS              = 'aks-nexvion-dev'
+    TAG              = "v${BUILD_NUMBER}"
+    AZURE_CONFIG_DIR = "${WORKSPACE}/.azure"
+    KUBECONFIG       = "${WORKSPACE}/.kube/config"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Security Scans') {
+      steps {
+        sh '''
+          echo "== Secret scan (Gitleaks) =="
+          docker run --rm -v "$WORKSPACE":/repo zricethezav/gitleaks:latest detect --source=/repo --redact --verbose
+
+          echo "== Dependency / config scan (Trivy fs) =="
+          trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs .azure,.kube --exit-code 0 .
+        '''
+      }
+    }
+
+    stage('Build Image') {
+      steps {
+        sh 'docker build -f docker/Dockerfile -t $ACR_SERVER/$IMAGE:$TAG .'
+      }
+    }
+
+    stage('Image Scan (Trivy)') {
+      steps {
+        sh 'trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress $ACR_SERVER/$IMAGE:$TAG'
+      }
+    }
+
+    stage('Azure Login') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'azure-sp', usernameVariable: 'AZ_APP', passwordVariable: 'AZ_PASS'),
+          string(credentialsId: 'azure-tenant', variable: 'AZ_TENANT')
+        ]) {
+          sh '''
+            az login --service-principal -u "$AZ_APP" -p "$AZ_PASS" --tenant "$AZ_TENANT" > /dev/null
+            az account show --query name -o tsv
+          '''
+        }
+      }
+    }
+
+    stage('Push to ACR') {
+      steps {
+        sh '''
+          az acr login --name $ACR_NAME
+          docker push $ACR_SERVER/$IMAGE:$TAG
+        '''
+      }
+    }
+
+    stage('Deploy to AKS') {
+      steps {
+        sh '''
+          mkdir -p "$WORKSPACE/.kube"
+          az aks get-credentials -g $RG -n $AKS --overwrite-existing
+          helm upgrade --install nexvion helm/ecommerce -n nexvion --create-namespace \
+            --set image.tag=$TAG --wait --timeout 3m
+          kubectl rollout status deployment/nexvion-web -n nexvion --timeout=180s
+        '''
+      }
+    }
+
+    stage('Health Check') {
+      steps {
+        sh '''
+          IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Ingress IP: $IP"
+          for i in $(seq 1 10); do
+            if curl -fs http://$IP/health > /dev/null; then
+              echo "Healthy: http://$IP"; exit 0
+            fi
+            echo "Attempt $i failed, retrying..."; sleep 5
+          done
+          echo "Unhealthy"; exit 1
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'az logout || true'
+      sh 'docker image prune -f || true'
+    }
+    success { echo "Deployed $TAG successfully" }
+    failure { echo "Pipeline failed, check the stage logs" }
+  }
+}
